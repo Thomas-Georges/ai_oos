@@ -148,7 +148,9 @@ class reward_conditions:
             #print(f'position in centimeters {pos_cm}')
             #print(f'velocity in centimeters {vel_cm}')
             #if less than 20cm away and less than 1cm/s
-            if np.linalg.norm(pos_cm) < 1000 and np.linalg.norm(vel_cm) < 200:
+            #if np.linalg.norm(pos_cm) < 1000 and np.linalg.norm(vel_cm) < 200:
+                #return True
+            if np.linalg.norm(pos_cm) < 20 and np.linalg.norm(vel_cm) < 1:
                 return True
         return False
 
@@ -232,13 +234,14 @@ class reward_formulation(reward_conditions):
 
         xTQ = x.T @ Q
         xTQx = xTQ @ x
-        xTQx = xTQx / 200.0
+        #xTQx = xTQx / 200.0
 
         u = self.chaser.actuation.copy()
         u = u / self.chaser.mass
         uTR = u.T @ R
         uTRu = uTR @ u
-        uTRu = uTRu * 20000.0
+        #uTRu = uTRu * 20000.0
+        #uTRu = uTRu* 2000000000000000000000000000000.0
 
         #costcm = c*(udt)**2
         n_utrace = len(self.chaser.u_trace)

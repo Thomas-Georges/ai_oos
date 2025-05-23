@@ -19,31 +19,39 @@ def benchmark_PPO(
     bench_model_name,
     stats_file,
     wrapper_kwargs={"max_steps": 2500},
+    env_kwargs = ENV_KWARGS,
+    gym_kwargs = VECENV_KWARGS,
     n_episodes = 10,
 ):
     # build your eval env (benchmark mode => no further norm updates)
     bench_env = build_env(
         bench_model_name,
         stats_file=stats_file,
-        make_env_kwargs=ENV_KWARGS,
+        training = False,
+        make_env_kwargs=env_kwargs,
         wrapper_kwargs=wrapper_kwargs,
-        gym_kwargs = VECENV_KWARGS,
+        gym_kwargs = gym_kwargs,
     )
 
     model_fp = os.path.join(os.getcwd(), 'models',f"{bench_model_name}.zip")
-    model = PPO.load(model_fp, env=bench_env, force_reset=True)
 
-    terminal_data, fuel_data = evaluate_policy(
+    try:
+
+        model = PPO.load(model_fp, env=bench_env, force_reset=True)
+
+        terminal_data, fuel_data = evaluate_policy(
         model = model,env = bench_env, n_eval_episodes=n_episodes, deterministic=False
     )
-    return {
-        "terminal": terminal_data,
-        "fuel":     fuel_data,
-        # "length":   eplen_data,
-        # "runtime":  runtime,
-        # "test1": test1,
-        # "test2": test2
-    }
+        return {
+            "terminal": terminal_data,
+            "fuel":     fuel_data,
+            # "length":   eplen_data,
+            # "runtime":  runtime,
+            # "test1": test1,
+            # "test2": test2
+            }
+    finally:
+        bench_env.close()
 
 
 #first_bench = benchmark_PPO('vbar-agentFirstNoLoad', stats_file=BASE_STATS)

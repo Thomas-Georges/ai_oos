@@ -120,7 +120,6 @@ def main():
     parser.add_argument("--bench-gym-kwargs", type=json.loads, default="{}", help="JSON GYM_KWARGS override for bench")
 
     args = parser.parse_args()
-    print('TEEEST')
     print(args.model_name)
 
     results = train_benchmark_analyze(
@@ -137,9 +136,11 @@ def main():
         callback           = CHECKBACK,    # only for train
     )
 
+    print(results)
+
     print("\n=== Final Summary ===")
-    print("Benchmark:", results["benchmark"])
-    print("Analysis: ", results["analysis"])
+    # print("Benchmark:", results["benchmark"])
+    # print("Analysis: ", results["analysis"])
     print("\n✅ Done.")
 
 if __name__ == "__main__":

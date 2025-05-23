@@ -10,6 +10,22 @@ chaser_discrete
 cw_continous
 chaser_continous
 """
+
+
+PHASE_CONFIG = {
+    1: {
+        "pos_low" : np.array([-100.0, 400.0,  -5.0], dtype=np.float64),
+        "pos_high": np.array([ 100.0, 600.0,   5.0], dtype=np.float64),
+        "vel_low" : np.array([  -2.0,  -2.0,  -2.0], dtype=np.float64),
+        "vel_high": np.array([   1.0,   1.0,   1.0], dtype=np.float64),
+    },
+    2: {
+        "pos_low" : np.array([-400.0, 400.0, -400.0], dtype=np.float64),
+        "pos_high": np.array([ 400.0,1200.0, 400.0], dtype=np.float64),
+        "vel_low" : np.array([  -2.0,  -2.0,  -2.0], dtype=np.float64),
+        "vel_high": np.array([   1.0,   1.0,   1.0], dtype=np.float64),
+    },
+}
 class cw_discrete:
 
     def __init__(self):
@@ -211,8 +227,6 @@ class cw_continous:
         print(f'gravitational constant is {gravitational_constant}')
         a = float(42164000)
         n = np.sqrt(gravitational_constant / (a ** 3.0))
-        m_chaser = 500.0 #kg
-
 
         self.A = np.array([[0, 0, 0, 1, 0, 0],
                      [0, 0, 0, 0, 1, 0],
@@ -239,16 +253,10 @@ class cw_continous:
 
         x = np.array(state, dtype=np.float64)
         u = np.array(action, dtype=np.float64)
-        #u = u / mass
-        #print(x)
-        #print(f'x shape {x.shape}')
         x = np.reshape(x, (6))
         u = np.reshape(u, (3))
-        #pdb.set_trace()
-        #print(f'action used in newtons {u}')
         u = u / mass
 
-        #print(f'control input divided by mass {u}')
         #dt = 0.05
 
         T = 1.0
@@ -273,7 +281,6 @@ class cw_continous:
         #vode_f = np.vectorize(ode_f)
 
         sol = solve_ivp(ode_f, (0, T), x, args=(self.B, u), method='RK45', vectorized=False)
-        #print('solved')
         xRK4 = sol.y
         x_next = np.zeros(6, dtype=np.float64)
 
@@ -284,18 +291,14 @@ class cw_continous:
         """
 
         x_next = xRK4[:, -1]
-        #print(f'action divided by mass {mass}: {u}')
-        #x_next = np.matmul(self.A,x) + np.matmul(self.B,u)
-        #x_next = (np.dot(self.A,x)) + ( np.dot(self.B,u) / mass )
-        #print('attempting to reshape')
-        #x_next = np.reshape(x_next, (6,))
         assert x_next.shape == (6,), 'shape error'
         return x_next
 
 
 class chaser_continous(cw_continous):
-    def __init__(self, use_vbar, use_rbar):
+    def __init__(self, use_vbar, use_rbar, phase):
         super().__init__()
+        self.phase = phase
         self.state_trace = []
         self.u_trace = []
         self.mass = 500.0 #500kg
@@ -332,34 +335,45 @@ class chaser_continous(cw_continous):
 
         self.use_rbar = input
 
+    # def init_v_bar(self):
+    #     """
+    #     The starting position for the V-bar approach was 
+    #     [0, 1000, 0] m ± [100, 100, 5] m
+
+    #     reference : https://www.researchgate.net/profile/Richard-Linares/publication/331135519_Spacecraft_Rendezvous_Guidance_in_Cluttered_Environments_via_Reinforcement_Learning/links/5c672585a6fdcc404eb44d45/Spacecraft-Rendezvous-Guidance-in-Cluttered-Environments-via-Reinforcement-Learning.pdf
+    #     """
+
+    #     v_bar_start = np.array([0,800,0], np.float64)
+    #     v_bar_range = np.array([200*2, 150*2, 200*2], np.float64)
+
+    #     """
+    #     two uniform distributions from [0,1) subtracted from each other
+    #     to generate random floats between [-1,1]
+    #     """
+    #     percentage_offsets = np.random.random_sample(3) - np.random.random_sample(3)
+
+    #     #offset from v_bar_start in units
+    #     offsets = np.multiply(v_bar_range, percentage_offsets)
+
+    #     #add offsets to v_bar_start
+    #     pos = np.add(v_bar_start, offsets)
+    #     #vel = np.random.randint(low=-10, high=10, size=3)
+    #     range = np.random.randint(low=-2, high=2)
+    #     vel = range * np.random.random_sample((3,))
+    #     x0 = np.concatenate((pos, vel), axis=None, dtype=np.float64)
+    #     return x0
+    
+    
     def init_v_bar(self):
-        """
-        The starting position for the V-bar approach was 
-        [0, 1000, 0] m ± [100, 100, 5] m
+        cfg = PHASE_CONFIG.get(self.phase)
+        if cfg is None:
+            raise ValueError(f"No PHASE_CONFIG for phase={self.phase}")
 
-        reference : https://www.researchgate.net/profile/Richard-Linares/publication/331135519_Spacecraft_Rendezvous_Guidance_in_Cluttered_Environments_via_Reinforcement_Learning/links/5c672585a6fdcc404eb44d45/Spacecraft-Rendezvous-Guidance-in-Cluttered-Environments-via-Reinforcement-Learning.pdf
-        """
+        # draw uniformly in [low, high] for both pos and vel
+        pos = np.random.uniform(cfg["pos_low"], cfg["pos_high"])
+        vel = np.random.uniform(cfg["vel_low"], cfg["vel_high"])
 
-        v_bar_start = np.array([0,800,0], np.float64)
-        v_bar_range = np.array([200*2, 150*2, 200*2], np.float64)
-
-        """
-        two uniform distributions from [0,1) subtracted from each other
-        to generate random floats between [-1,1]
-        """
-        percentage_offsets = np.random.random_sample(3) - np.random.random_sample(3)
-
-        #offset from v_bar_start in units
-        offsets = np.multiply(v_bar_range, percentage_offsets)
-
-        #add offsets to v_bar_start
-        pos = np.add(v_bar_start, offsets)
-        #vel = np.random.randint(low=-10, high=10, size=3)
-        range = np.random.randint(low=-2, high=2)
-        vel = range * np.random.random_sample((3,))
-        x0 = np.concatenate((pos, vel), axis=None, dtype=np.float64)
-        return x0
-
+        return np.concatenate([pos, vel], axis=0)
     def init_r_bar(self):
         """
         The starting position for the V-bar approach was 

@@ -4,7 +4,7 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
-from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation, PillowWriter
 
 
 def animate_all_chasers(
@@ -13,7 +13,10 @@ def animate_all_chasers(
     half_angle_deg=20,
     cone_height=200,
     interval=50,
-    only_initial=False
+    only_initial=False,
+    save_animation = True,
+    save_path = 'firstAnimation.gif',
+    fps = 20
 ):
     """
     Animate or scatter chaser trajectories in `runs/vbar{name_folder}`.
@@ -107,7 +110,14 @@ def animate_all_chasers(
         fig, update, frames=num_frames,
         init_func=init, blit=True, interval=interval
     )
-    plt.tight_layout(); plt.show()
+    plt.tight_layout()
+    if save_animation:
+        # choose the PillowWriter
+        writer = PillowWriter(fps=fps)
+        ani.save(save_path, writer=writer)
+        print(f"Saved animation to {save_path}")
+    else:
+        plt.show()
     return ani
 
 

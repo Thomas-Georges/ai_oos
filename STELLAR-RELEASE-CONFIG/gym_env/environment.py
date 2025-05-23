@@ -15,10 +15,11 @@ class ARPOD_GYM(gym.Env):
 
     metadata = {"render.modes": ["human"]}
 
-    def __init__(self,model_name, benchmark=False):
+    def __init__(self,model_name, phase,benchmark=False):
         super(ARPOD_GYM, self).__init__()
         root = "Benchmark" if benchmark else "Train"
         cwd = os.getcwd()
+        self.phase = phase
 
         runs_base = os.path.join(cwd, root, "runs")
         os.makedirs(runs_base, exist_ok=True)
@@ -59,16 +60,21 @@ class ARPOD_GYM(gym.Env):
         # Define action and observation space
         # They must be gym.spaces objects
         # Example when using discrete actions:
+        # self.action_space = spaces.Box(low=-100.0, high=100.0,
+        #                                     shape=(3,), dtype=np.float32)
+        
         self.action_space = spaces.Box(low=-10.0, high=10.0,
-                                            shape=(3,), dtype=np.float32)
+                                            shape=(3,), dtype=np.float64)
         # Example for using image as input (channel-first; channel-last also works):
-        self.observation_space = spaces.Box(low=-2000.0, high=2000.0,
-                                            shape=(6,), dtype=np.float32)
+        # self.observation_space = spaces.Box(low=-2000.0, high=2000.0,
+        #                                     shape=(6,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-5000.0, high=5000.0,
+                                            shape=(6,), dtype=np.float64)
                                             
 
         self.episode = 0
         #self.r_form = reward_formulation(chaser)
-        self.chaser = chaser_continous(True, False)
+        self.chaser = chaser_continous(use_vbar = True, use_rbar = False, phase = self.phase)
         self.r_form = reward_formulation(self.chaser)
         self.info = {'time in los' : 0,
                      'time in validslowzone' : 0,
@@ -88,24 +94,13 @@ class ARPOD_GYM(gym.Env):
                     'gross_reward' : 0.001}
         self.iscontinous = True
 
-  
-
-        # model_id = len(os.listdir('runs/'))
-        # self.runs_dir = f'vbar{model_id}'
-
-        # print(f'creating runs log in directory {self.runs_dir}')
-        # os.mkdir(f'runs/{self.runs_dir}')
-        # os.mkdir(f'actuations/{self.runs_dir}')
-        # os.mkdir(f'velocities/{self.runs_dir}')
-
-
     def step(self, action):
         reward = 0
         done = False
         truncated = False
         terminated = False
-        is_lower_bound = np.greater_equal(action, [-10, -10, -10])
-        is_upper_bound = np.less_equal(action, [10, 10, 10])
+        is_lower_bound = np.greater_equal(action, [-100, -100, -100])
+        is_upper_bound = np.less_equal(action, [100, 100, 100])
         assert np.all(is_lower_bound) and np.all(is_upper_bound)
         #print(action)
         #rescaled_action = -10.0 + (0.5 * (action + 1.0) * (10.0 - (-10.0)) )

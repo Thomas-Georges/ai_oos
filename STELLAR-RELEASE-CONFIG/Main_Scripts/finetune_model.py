@@ -1,5 +1,6 @@
 import numpy as np
 import os,sys
+import glob
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
@@ -13,7 +14,6 @@ from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.logger import HParam
 import gymnasium as gym
 import os
-from gymnasium.wrappers import TimeLimit
 from torch.nn import GELU
 from stable_baselines3.common.vec_env import VecNormalize
 from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
@@ -165,25 +165,34 @@ PPO_KWARGS = {
 def build_env(
     model_name: str,
     stats_file: str,
+    training = True,
     make_env_kwargs= ENV_KWARGS,
-    wrapper_kwargs={"max_steps": 100},
+    wrapper_kwargs={"max_steps": 2500},
     gym_kwargs  = VECENV_KWARGS):
 
     # ensure model_name is set
     gym_kwargs = {**gym_kwargs, "model_name": model_name}
 
+
     # build and normalize
     env  = make_vec_env(ARPOD_GYM, **make_env_kwargs, env_kwargs=gym_kwargs, wrapper_kwargs=wrapper_kwargs)
-    norm = VecNormalize.load(stats_file, env)
-    norm.training = True
-    return norm
+
+    if stats_file is not False:
+        norm_env = VecNormalize.load(stats_file, env)
+        norm_env.training = training
+    else:
+        norm_env = VecNormalize(env,
+                            training=training,
+                            norm_obs=True,
+                            norm_reward=True)
+    return norm_env
 
 
 def train_PPO(
     model_name,
     stats_file,
     total_timesteps,
-    load_model = None,
+    load_model = False,
     callback = CHECKBACK,
     policy_dict = POLICY_DICT,
     wrapper_kwargs = {"max_steps": 2500},
@@ -192,33 +201,60 @@ def train_PPO(
     gym_kwargs = VECENV_KWARGS
 ):
     # build your training env
+
     train_env = build_env(
         model_name,
         stats_file,
+        training = True,
         wrapper_kwargs=wrapper_kwargs,
         make_env_kwargs=env_kwargs,
         gym_kwargs=gym_kwargs,
     )
 
-    if load_model is not None:
+    models_dir = os.path.join(os.getcwd(), 'models')
+    os.makedirs(models_dir, exist_ok=True)
+
+    # find existing files like "model_name_1.zip", "model_name_2.zip", …
+    # pattern = os.path.join(models_dir, f"{model_name}_*.zip")
+    # existing = glob.glob(pattern)
+    # idxs = []
+    # for path in existing:
+    #     base = os.path.basename(path)
+    #     # split off the trailing "_<id>.zip"
+    #     parts = base.rsplit("_", 1)
+    #     if len(parts) == 2 and parts[1].endswith(".zip"):
+    #         num = parts[1][:-4]   # remove ".zip"
+    #         if num.isdigit():
+    #             idxs.append(int(num))
+    # run_id = max(idxs) + 1 if idxs else 1
+
+    if load_model is not False:
         model_fp = os.path.join(os.getcwd(), load_model)
         model = PPO.load(model_fp, env=train_env) 
+        model.policy.action_space = train_env.action_space
+
     else:
         model = PPO(ActorCriticPolicy, env = train_env, **ppo_kwargs)
         model.policy.policy_kwargs = policy_dict
-    # train
-    model.learn(
-        total_timesteps=total_timesteps,
-        reset_num_timesteps=True,
-        progress_bar=True,
-        callback=callback,
-        tb_log_name=model_name,
-    )
+        model.policy.action_space = train_env.action_space
 
-    model.save(os.path.join(os.getcwd(), 'models', f'{model_name}.zip'))
-    new_stats = model.get_vec_normalize_env()  
-    new_stats.save(os.path.join(os.getcwd(),'envstats', f'{model_name}.pkl'))
-    return model
+    # train
+    try:
+
+        model.learn(
+            total_timesteps=total_timesteps,
+            reset_num_timesteps=True,
+            progress_bar=True,
+            callback=callback,
+            tb_log_name=model_name,
+        )
+
+        model.save(os.path.join(os.getcwd(), 'models', f'{model_name}.zip'))
+        new_stats = model.get_vec_normalize_env()  
+        new_stats.save(os.path.join(os.getcwd(),'envstats', f'{model_name}.pkl'))
+        return model
+    finally:
+        train_env.close
 
 #test_train_model = train_PPO('vbar-agentFirstNoLoad',BASE_STATS, 50000,load_model = None)
 
